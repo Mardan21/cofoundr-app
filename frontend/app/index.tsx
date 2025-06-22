@@ -11,10 +11,10 @@ export default function Index() {
     if (!isLoading) {
       if (!isAuthenticated) {
         router.replace("/(auth)/welcome");
-      } else if (!user?.profileType) {
+      } else if (!user?.full_name || !user?.profileType) {
         router.replace("/(app)/profile-setup");
       } else {
-        router.replace("/(app)/home");
+        router.replace("/(app)/browse");
       }
     }
   }, [isAuthenticated, isLoading, user]);
