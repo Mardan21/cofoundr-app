@@ -373,6 +373,35 @@ async def get_user_profile(user_id: str, include_audio: bool = False, db: MongoD
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting user profile: {str(e)}")
 
+@app.put("/users/{user_id}/profile", response_model=Dict[str, Any])
+async def update_user_profile(user_id: str, profile_data: Dict[str, Any], db: MongoDBManager = Depends(get_db)):
+    """Update a user's profile"""
+    try:
+        # Verify user exists
+        user = await db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update the user profile
+        success = await db.update_user(user_id, profile_data)
+        
+        if success:
+            # Get the updated user profile
+            updated_user = await db.get_user_by_id(user_id)
+            
+            return {
+                "message": "Profile updated successfully",
+                "user_id": user_id,
+                "profile": clean_objectids(updated_user)
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update user profile")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating user profile: {str(e)}")
+
 @app.get("/users/{user_id}/swipe-history")
 async def get_swipe_history(user_id: str, limit: int = 20, db: MongoDBManager = Depends(get_db)):
     """Get user's swipe history"""
