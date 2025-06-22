@@ -171,37 +171,74 @@ export default function BrowseScreen() {
         ]}
         {...dragHandlers}
       >
-        <View style={styles.card}>
+        <LinearGradient 
+          colors={["#ffffff", "#f8fafc"]} 
+          style={styles.card}
+        >
           {/* Profile Header */}
           <View style={styles.cardHeader}>
-            <Avatar.Image size={80} source={{ uri: profile.avatar }} />
+            <View style={styles.avatarContainer}>
+              <Avatar.Image size={90} source={{ uri: profile.avatar }} />
+            </View>
             <View style={styles.headerInfo}>
-              <Title style={styles.name}>{profile.name}</Title>
-              <Text style={styles.role}>
-                {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-              </Text>
-              <Text style={styles.location}>📍 {profile.location}</Text>
+              <View style={styles.nameRow}>
+                <Title style={styles.name}>{profile.name}</Title>
+                <View style={styles.verifiedBadge}>
+                  <Icon name="check-decagram" size={24} color="#ffffff" />
+                </View>
+              </View>
+              <View style={styles.roleContainer}>
+                <LinearGradient
+                  colors={["#ddd6fe", "#e0e7ff"]}
+                  style={styles.roleBadge}
+                >
+                  <Text style={styles.roleText}>
+                    {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
+                  </Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.locationRow}>
+                <Icon name="map-marker" size={16} color="#6b7280" />
+                <Text style={styles.location}>{profile.location}</Text>
+              </View>
             </View>
           </View>
 
           {/* Profile Content */}
-          <View style={styles.contentArea}>
-            <Text style={styles.startupIdea}>{profile.startupIdea}</Text>
-
-            <View style={styles.chipsContainer}>
-              {profile.skills.slice(0, 3).map((skill, idx) => (
-                <Chip
-                  key={idx}
-                  style={styles.chip}
-                  textStyle={styles.chipText}
-                >
-                  {skill}
-                </Chip>
-              ))}
+          <ScrollView 
+            style={styles.contentArea}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          >
+            <View style={styles.ideaContainer}>
+              <View style={styles.ideaHeader}>
+                <Icon name="lightbulb-outline" size={20} color="#f59e0b" />
+                <Text style={styles.ideaLabel}>Startup Idea</Text>
+              </View>
+              <Text style={styles.startupIdea}>{profile.startupIdea}</Text>
             </View>
 
-            <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>Looking for:</Text>
+            <View style={styles.skillsSection}>
+              <Text style={styles.skillsLabel}>Skills & Expertise</Text>
+              <View style={styles.chipsContainer}>
+                {profile.skills.slice(0, 3).map((skill, idx) => (
+                  <View key={idx} style={styles.chipWrapper}>
+                    <LinearGradient
+                      colors={["#f8fafc", "#f1f5f9"]}
+                      style={styles.chip}
+                    >
+                      <Text style={styles.chipText}>{skill}</Text>
+                    </LinearGradient>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.lookingForSection}>
+              <View style={styles.lookingForHeader}>
+                <Icon name="account-search" size={20} color="#6366f1" />
+                <Text style={styles.sectionTitle}>Looking for</Text>
+              </View>
               <Text style={styles.lookingFor}>{profile.lookingFor}</Text>
             </View>
 
@@ -211,34 +248,68 @@ export default function BrowseScreen() {
                   <View style={styles.divider} />
                 </View>
 
-                <View style={styles.infoSection}>
-                  <Text style={styles.sectionTitle}>Bio:</Text>
+                <View style={styles.detailSection}>
+                  <View style={styles.detailHeader}>
+                    <Icon name="account-circle" size={20} color="#8b5cf6" />
+                    <Text style={styles.detailTitle}>About</Text>
+                  </View>
                   <Text style={styles.infoText}>{profile.bio}</Text>
                 </View>
 
-                <View style={styles.infoSection}>
-                  <Text style={styles.sectionTitle}>Experience:</Text>
+                <View style={styles.detailSection}>
+                  <View style={styles.detailHeader}>
+                    <Icon name="briefcase" size={20} color="#10b981" />
+                    <Text style={styles.detailTitle}>Experience</Text>
+                  </View>
                   <Text style={styles.infoText}>{profile.experience}</Text>
                 </View>
 
-                <View style={styles.infoSection}>
-                  <Text style={styles.sectionTitle}>Education:</Text>
+                <View style={styles.detailSection}>
+                  <View style={styles.detailHeader}>
+                    <Icon name="school" size={20} color="#f59e0b" />
+                    <Text style={styles.detailTitle}>Education</Text>
+                  </View>
                   <Text style={styles.infoText}>{profile.education}</Text>
+                </View>
+
+                <View style={styles.achievementsSection}>
+                  <View style={styles.detailHeader}>
+                    <Icon name="trophy" size={20} color="#ef4444" />
+                    <Text style={styles.detailTitle}>Achievements</Text>
+                  </View>
+                  {profile.accomplishments.map((achievement, idx) => (
+                    <View key={idx} style={styles.achievementItem}>
+                      <Icon name="star" size={16} color="#f59e0b" />
+                      <Text style={styles.achievementText}>{achievement}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             )}
-          </View>
+            
+            <View style={styles.bottomPadding} />
+          </ScrollView>
 
           {/* Expand Button */}
-          <TouchableOpacity
-            onPress={() => setExpandedCard(!expandedCard)}
+          <LinearGradient
+            colors={["rgba(255,255,255,0.95)", "rgba(248,250,252,0.95)"]}
             style={styles.expandButton}
           >
-            <Text style={styles.expandText}>
-              {expandedCard ? "Show Less ▲" : "Show More ▼"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={() => setExpandedCard(!expandedCard)}
+              style={styles.expandButtonTouch}
+            >
+              <Text style={styles.expandText}>
+                {expandedCard ? "Show Less" : "Show More"}
+              </Text>
+              <Icon 
+                name={expandedCard ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color="#6366f1" 
+              />
+            </TouchableOpacity>
+          </LinearGradient>
+        </LinearGradient>
       </Animated.View>
     );
   };
@@ -431,37 +502,75 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 0,
     backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   cardHeader: {
     flexDirection: "row",
-    marginBottom: 20,
+    marginBottom: 0,
+    padding: 24,
+    paddingBottom: 16,
+  },
+  avatarContainer: {
+    position: "relative",
   },
   headerInfo: {
     marginLeft: 15,
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   name: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#1f2937",
   },
-  role: {
-    fontSize: 16,
+  verifiedBadge: {
+    marginLeft: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#3b82f6",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#3b82f6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  roleContainer: {
+    marginTop: 4,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: "#e5e7eb",
+  },
+  roleText: {
+    fontSize: 12,
     color: "#6366f1",
     fontWeight: "600",
+  },
+  locationRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
   },
   location: {
     fontSize: 14,
     color: "#6b7280",
-    marginTop: 2,
   },
   scrollContainer: {
     flex: 1,
@@ -474,59 +583,61 @@ const styles = StyleSheet.create({
   },
   startupIdea: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "#1f2937",
-    marginBottom: 15,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   chipsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: 15,
   },
   chip: {
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: "#e5e7eb",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   chipText: {
     fontSize: 12,
-    color: "#374151",
+    color: "#475569",
+    fontWeight: "500",
   },
   infoSection: {
     marginBottom: 15,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#6b7280",
-    marginBottom: 4,
+    color: "#1f2937",
+    marginLeft: 8,
   },
   lookingFor: {
-    fontSize: 14,
-    color: "#1f2937",
-    lineHeight: 20,
+    fontSize: 15,
+    color: "#4b5563",
+    lineHeight: 22,
   },
   expandedContent: {
-    marginTop: 10,
+    marginTop: 20,
+    paddingTop: 20,
   },
   dividerContainer: {
-    marginVertical: 10,
+    marginBottom: 20,
   },
   divider: {
     height: 1,
     backgroundColor: "#e5e7eb",
   },
   expandButton: {
-    paddingVertical: 15,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    marginTop: 10,
+    borderTopColor: "#f3f4f6",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   expandText: {
     textAlign: "center",
     color: "#6366f1",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
   },
   actionButtons: {
@@ -614,10 +725,81 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
+    paddingHorizontal: 24,
   },
   infoText: {
     fontSize: 14,
     color: "#6b7280",
     lineHeight: 20,
+    marginLeft: 28,
+  },
+  ideaContainer: {
+    marginBottom: 20,
+  },
+  ideaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  ideaLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6b7280",
+    marginLeft: 8,
+  },
+  skillsSection: {
+    marginBottom: 20,
+  },
+  skillsLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6b7280",
+    marginBottom: 12,
+  },
+  lookingForSection: {
+    marginBottom: 20,
+  },
+  lookingForHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  detailSection: {
+    marginBottom: 15,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  detailTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6b7280",
+  },
+  achievementsSection: {
+    marginBottom: 15,
+  },
+  achievementItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  achievementText: {
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  bottomPadding: {
+    height: 80,
+  },
+  expandButtonTouch: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 10,
+  },
+  chipWrapper: {
+    marginRight: 8,
+    marginBottom: 8,
   },
 });
