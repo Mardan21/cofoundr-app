@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 import uuid
 from datetime import datetime
+import base64
 
 from .models import (
     UserProfile, SwipeDecision, RecommendationRequest, 
@@ -212,6 +213,19 @@ async def create_user(request: CreateUserRequest, db: MongoDBManager = Depends(g
         
         # Merge frontend data with LinkedIn data
         merged_user_data = merge_frontend_with_linkedin_data(frontend_data, linkedin_data)
+        
+        # Generate audio if not already generated from LinkedIn
+        if not audio_base64:
+            try:
+                # Create a simple summary from bio and startup idea
+                summary_text = f"{merged_user_data.get('bio', '')} {merged_user_data.get('startupIdea', '')}"
+                if summary_text.strip():
+                    audio_result = await linkedin_integration.text_to_speech(summary_text)
+                    if audio_result:
+                        audio_base64 = base64.b64encode(audio_result).decode('utf-8')
+                        print(f"✅ Generated audio from bio and startup idea")
+            except Exception as e:
+                print(f"⚠️  Error generating audio: {e}")
         
         # Create user in database
         user_id = await db.create_user(merged_user_data, audio_base64)
@@ -564,7 +578,6 @@ async def convert_text_to_speech(text: str):
         
         if audio_data:
             # Convert to base64 for API response
-            import base64
             audio_base64 = base64.b64encode(audio_data).decode('utf-8')
             
             return {
