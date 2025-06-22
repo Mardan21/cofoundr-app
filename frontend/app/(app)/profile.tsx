@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
 import {
   Avatar,
   Card,
@@ -11,6 +11,8 @@ import {
   List,
   Text,
   Title,
+  Chip,
+  Button,
 } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -23,6 +25,58 @@ export default function ProfileScreen() {
     router.replace("/(auth)/welcome");
   };
 
+  const formatDate = (dateInfo: any) => {
+    if (!dateInfo || dateInfo === "None") return "Present";
+    if (typeof dateInfo === 'object' && dateInfo.year) {
+      return `${dateInfo.month}/${dateInfo.year}`;
+    }
+    return "Present";
+  };
+
+  const renderExperience = (experience: any, index: number) => (
+    <View key={index} style={styles.experienceItem}>
+      <View style={styles.experienceHeader}>
+        <Text style={styles.experienceTitle}>{experience.title}</Text>
+        <Text style={styles.experienceCompany}>{experience.company}</Text>
+      </View>
+      <Text style={styles.experienceDuration}>
+        {formatDate(experience.starts_at)} - {formatDate(experience.ends_at)}
+      </Text>
+      {experience.location && (
+        <Text style={styles.experienceLocation}>{experience.location}</Text>
+      )}
+      {experience.description && (
+        <Text style={styles.experienceDescription}>{experience.description}</Text>
+      )}
+    </View>
+  );
+
+  const renderEducation = (education: any, index: number) => (
+    <View key={index} style={styles.educationItem}>
+      <View style={styles.educationHeader}>
+        <Text style={styles.educationSchool}>{education.school}</Text>
+        <Text style={styles.educationDegree}>
+          {education.degree_name} {education.field_of_study && `in ${education.field_of_study}`}
+        </Text>
+      </View>
+      <Text style={styles.educationDuration}>
+        {formatDate(education.starts_at)} - {formatDate(education.ends_at)}
+      </Text>
+      {education.description && (
+        <Text style={styles.educationDescription}>{education.description}</Text>
+      )}
+    </View>
+  );
+
+  const renderProject = (project: any, index: number) => (
+    <View key={index} style={styles.projectItem}>
+      <Text style={styles.projectName}>{project.name}</Text>
+      {project.description && (
+        <Text style={styles.projectDescription}>{project.description}</Text>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -32,26 +86,30 @@ export default function ProfileScreen() {
           icon="pencil"
           size={24}
           iconColor="white"
-          onPress={() => {
-            /* Navigate to edit profile */
-          }}
+          onPress={() => router.push("/(app)/edit-profile")}
         />
       </LinearGradient>
 
       <ScrollView style={styles.content}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <Avatar.Icon size={100} icon="account" style={styles.avatar} />
-          <Title style={styles.name}>{user?.name || "Your Name"}</Title>
-          <Text style={styles.role}>
-            {user?.profileType
-              ? user.profileType.charAt(0).toUpperCase() +
-                user.profileType.slice(1)
-              : "Role"}
+          {user?.profile_pic_url ? (
+            <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImage} />
+          ) : (
+            <Avatar.Icon size={100} icon="account" style={styles.avatar} />
+          )}
+          <Title style={styles.name}>{user?.full_name || "Your Name"}</Title>
+          <Text style={styles.role}>{user?.role || "Professional"}</Text>
+          <Text style={styles.location}>
+            {user?.city && user?.state ? `${user.city}, ${user.state}` : "Location not set"}
           </Text>
-          <Text style={styles.company}>
-            {user?.showCompany && user?.companyName}
-          </Text>
+          <Chip 
+            mode="outlined" 
+            style={styles.profileTypeChip}
+            textStyle={styles.profileTypeText}
+          >
+            {user?.profileType ? user.profileType.charAt(0).toUpperCase() + user.profileType.slice(1) : "Founder"}
+          </Chip>
         </View>
 
         {/* Stats */}
@@ -72,7 +130,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Profile Info */}
+        {/* About */}
         <Card style={styles.card}>
           <Card.Content>
             <Title style={styles.sectionTitle}>About</Title>
@@ -80,25 +138,82 @@ export default function ProfileScreen() {
           </Card.Content>
         </Card>
 
+        {/* Startup Idea */}
+        <Card style={styles.card}>
+          <Card.Content>
+            <Title style={styles.sectionTitle}>Startup Idea</Title>
+            <Text style={styles.startupIdea}>{user?.startupIdea || "No startup idea added yet"}</Text>
+          </Card.Content>
+        </Card>
+
+        {/* Looking For */}
+        <Card style={styles.card}>
+          <Card.Content>
+            <Title style={styles.sectionTitle}>Looking For</Title>
+            <Text style={styles.lookingFor}>{user?.lookingFor || "No preference set yet"}</Text>
+          </Card.Content>
+        </Card>
+
+        {/* Skills */}
+        {user?.skills && user.skills.length > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Skills</Title>
+              <View style={styles.skillsContainer}>
+                {user.skills.map((skill, index) => (
+                  <Chip key={index} style={styles.skillChip} mode="outlined">
+                    {skill}
+                  </Chip>
+                ))}
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Experience */}
+        {user?.experiences && user.experiences.length > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Experience</Title>
+              {user.experiences.map((experience, index) => renderExperience(experience, index))}
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Education */}
+        {user?.education && user.education.length > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Education</Title>
+              {user.education.map((education, index) => renderEducation(education, index))}
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Projects */}
+        {user?.accomplishment_projects && user.accomplishment_projects.length > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Projects</Title>
+              {user.accomplishment_projects.map((project, index) => renderProject(project, index))}
+            </Card.Content>
+          </Card>
+        )}
+
         {/* Links */}
-        {(user?.linkedinUrl || user?.githubUsername) && (
+        {user?.links && user.links.length > 0 && (
           <Card style={styles.card}>
             <Card.Content>
               <Title style={styles.sectionTitle}>Links</Title>
-              {user?.linkedinUrl && (
+              {user.links.map((link, index) => (
                 <List.Item
-                  title="LinkedIn"
-                  description={user.linkedinUrl}
-                  left={(props) => <List.Icon {...props} icon="linkedin" />}
+                  key={index}
+                  title={link.name}
+                  description={link.url}
+                  left={(props) => <List.Icon {...props} icon="link" />}
+                  onPress={() => {/* Handle link opening */}}
                 />
-              )}
-              {user?.githubUsername && (
-                <List.Item
-                  title="GitHub"
-                  description={`@${user.githubUsername}`}
-                  left={(props) => <List.Icon {...props} icon="github" />}
-                />
-              )}
+              ))}
             </Card.Content>
           </Card>
         )}
@@ -110,9 +225,7 @@ export default function ProfileScreen() {
             <List.Item
               title="Edit Profile"
               left={(props) => <List.Icon {...props} icon="pencil" />}
-              onPress={() => {
-                /* Navigate to edit */
-              }}
+              onPress={() => router.push("/(app)/edit-profile")}
             />
             <List.Item
               title="Settings"
@@ -200,6 +313,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#6366f1",
     marginBottom: 10,
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 10,
+  },
   name: {
     fontSize: 24,
     fontWeight: "bold",
@@ -209,10 +328,17 @@ const styles = StyleSheet.create({
     color: "#6366f1",
     marginTop: 4,
   },
-  company: {
+  location: {
     fontSize: 14,
     color: "#6b7280",
     marginTop: 2,
+  },
+  profileTypeChip: {
+    marginTop: 8,
+    borderColor: "#6366f1",
+  },
+  profileTypeText: {
+    color: "#6366f1",
   },
   statsContainer: {
     flexDirection: "row",
@@ -250,6 +376,102 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4b5563",
     lineHeight: 20,
+  },
+  startupIdea: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 20,
+  },
+  lookingFor: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 20,
+  },
+  skillsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  skillChip: {
+    marginBottom: 8,
+  },
+  experienceItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  experienceHeader: {
+    marginBottom: 4,
+  },
+  experienceTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1f2937",
+  },
+  experienceCompany: {
+    fontSize: 14,
+    color: "#6366f1",
+  },
+  experienceDuration: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  experienceLocation: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  experienceDescription: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 18,
+  },
+  educationItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  educationHeader: {
+    marginBottom: 4,
+  },
+  educationSchool: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1f2937",
+  },
+  educationDegree: {
+    fontSize: 14,
+    color: "#6366f1",
+  },
+  educationDuration: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  educationDescription: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 18,
+  },
+  projectItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  projectName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1f2937",
+    marginBottom: 4,
+  },
+  projectDescription: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 18,
   },
   divider: {
     marginVertical: 10,

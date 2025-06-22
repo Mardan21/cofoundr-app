@@ -140,3 +140,34 @@ export const completeProfileSetup = async (profileData: ProfileSetupData): Promi
     throw error;
   }
 };
+
+/**
+ * Update user profile data
+ * @param userId User ID
+ * @param profileData Updated profile data
+ * @returns Updated user profile
+ */
+export const updateUserProfile = async (userId: string, profileData: Partial<User>): Promise<User> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, errorData.detail || `Failed to update user: ${response.statusText}`);
+    }
+
+    const updatedUserResponse = await response.json();
+    return updatedUserResponse.profile;
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(0, `Network error: ${error.message}`);
+  }
+};
