@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
 import {
   Avatar,
@@ -122,6 +123,7 @@ export default function BrowseScreen() {
 
   const handleAction = (action: "pass" | "interested" | "super") => {
     console.log(`Action: ${action} on ${profiles[currentIndex].name}`);
+    setExpandedCard(false);
     setCurrentIndex((prev) => prev + 1);
     swipe.setValue({ x: 0, y: 0 });
   };
@@ -169,71 +171,74 @@ export default function BrowseScreen() {
         ]}
         {...dragHandlers}
       >
-        <LinearGradient colors={["#f3f4f6", "#ffffff"]} style={styles.card}>
-          <TouchableOpacity
-            activeOpacity={0.95}
-            onPress={() => setExpandedCard(!expandedCard)}
-          >
-            <View style={styles.cardHeader}>
-              <Avatar.Image size={80} source={{ uri: profile.avatar }} />
-              <View style={styles.headerInfo}>
-                <Title style={styles.name}>{profile.name}</Title>
-                <Text style={styles.role}>
-                  {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-                </Text>
-                <Text style={styles.location}>📍 {profile.location}</Text>
-              </View>
+        <View style={styles.card}>
+          {/* Profile Header */}
+          <View style={styles.cardHeader}>
+            <Avatar.Image size={80} source={{ uri: profile.avatar }} />
+            <View style={styles.headerInfo}>
+              <Title style={styles.name}>{profile.name}</Title>
+              <Text style={styles.role}>
+                {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
+              </Text>
+              <Text style={styles.location}>📍 {profile.location}</Text>
+            </View>
+          </View>
+
+          {/* Profile Content */}
+          <View style={styles.contentArea}>
+            <Text style={styles.startupIdea}>{profile.startupIdea}</Text>
+
+            <View style={styles.chipsContainer}>
+              {profile.skills.slice(0, 3).map((skill, idx) => (
+                <Chip
+                  key={idx}
+                  style={styles.chip}
+                  textStyle={styles.chipText}
+                >
+                  {skill}
+                </Chip>
+              ))}
             </View>
 
-            <View style={styles.cardContent}>
-              <Text style={styles.startupIdea}>{profile.startupIdea}</Text>
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionTitle}>Looking for:</Text>
+              <Text style={styles.lookingFor}>{profile.lookingFor}</Text>
+            </View>
 
-              <View style={styles.chipsContainer}>
-                {profile.skills.slice(0, 3).map((skill, idx) => (
-                  <Chip
-                    key={idx}
-                    style={styles.chip}
-                    textStyle={styles.chipText}
-                  >
-                    {skill}
-                  </Chip>
-                ))}
-              </View>
-
-              <View style={styles.infoSection}>
-                <Text style={styles.sectionTitle}>Looking for:</Text>
-                <Text style={styles.lookingFor}>{profile.lookingFor}</Text>
-              </View>
-
-              {expandedCard && (
-                <View style={styles.expandedContent}>
-                  <Divider style={styles.divider} />
-
-                  <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Bio:</Text>
-                    <Text>{profile.bio}</Text>
-                  </View>
-
-                  <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Experience:</Text>
-                    <Text>{profile.experience}</Text>
-                  </View>
-
-                  <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Education:</Text>
-                    <Text>{profile.education}</Text>
-                  </View>
+            {expandedCard && (
+              <View style={styles.expandedContent}>
+                <View style={styles.dividerContainer}>
+                  <View style={styles.divider} />
                 </View>
-              )}
 
-              <TouchableOpacity onPress={() => setExpandedCard(!expandedCard)}>
-                <Text style={styles.expandText}>
-                  {expandedCard ? "Show Less ▲" : "Show More ▼"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.infoSection}>
+                  <Text style={styles.sectionTitle}>Bio:</Text>
+                  <Text style={styles.infoText}>{profile.bio}</Text>
+                </View>
+
+                <View style={styles.infoSection}>
+                  <Text style={styles.sectionTitle}>Experience:</Text>
+                  <Text style={styles.infoText}>{profile.experience}</Text>
+                </View>
+
+                <View style={styles.infoSection}>
+                  <Text style={styles.sectionTitle}>Education:</Text>
+                  <Text style={styles.infoText}>{profile.education}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Expand Button */}
+          <TouchableOpacity
+            onPress={() => setExpandedCard(!expandedCard)}
+            style={styles.expandButton}
+          >
+            <Text style={styles.expandText}>
+              {expandedCard ? "Show Less ▲" : "Show More ▼"}
+            </Text>
           </TouchableOpacity>
-        </LinearGradient>
+        </View>
       </Animated.View>
     );
   };
@@ -422,12 +427,13 @@ const styles = StyleSheet.create({
   cardContainer: {
     position: "absolute",
     width: screenWidth * 0.9,
-    height: screenHeight * 0.65,
+    height: screenHeight * 0.7,
   },
   card: {
     flex: 1,
     borderRadius: 20,
     padding: 20,
+    backgroundColor: "#ffffff",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -436,7 +442,7 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: "row",
-    marginBottom: 15,
+    marginBottom: 20,
   },
   headerInfo: {
     marginLeft: 15,
@@ -445,6 +451,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: "bold",
+    color: "#1f2937",
   },
   role: {
     fontSize: 16,
@@ -456,14 +463,21 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     marginTop: 2,
   },
-  cardContent: {
+  scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 80,
+  },
+  cardContent: {
   },
   startupIdea: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1f2937",
-    marginBottom: 10,
+    marginBottom: 15,
+    lineHeight: 22,
   },
   chipsContainer: {
     flexDirection: "row",
@@ -477,9 +491,10 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 12,
+    color: "#374151",
   },
   infoSection: {
-    marginBottom: 12,
+    marginBottom: 15,
   },
   sectionTitle: {
     fontSize: 14,
@@ -490,18 +505,29 @@ const styles = StyleSheet.create({
   lookingFor: {
     fontSize: 14,
     color: "#1f2937",
+    lineHeight: 20,
   },
   expandedContent: {
     marginTop: 10,
   },
-  divider: {
+  dividerContainer: {
     marginVertical: 10,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#e5e7eb",
+  },
+  expandButton: {
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    marginTop: 10,
   },
   expandText: {
     textAlign: "center",
     color: "#6366f1",
     fontSize: 14,
-    marginTop: 10,
+    fontWeight: "600",
   },
   actionButtons: {
     flexDirection: "row",
@@ -585,5 +611,13 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
+  },
+  contentArea: {
+    flex: 1,
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#6b7280",
+    lineHeight: 20,
   },
 });
