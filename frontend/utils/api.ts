@@ -171,3 +171,63 @@ export const updateUserProfile = async (userId: string, profileData: Partial<Use
     throw new ApiError(0, `Network error: ${error.message}`);
   }
 };
+
+/**
+ * Get recommendations for a user
+ * @param userId User ID
+ * @param limit Number of recommendations to fetch
+ * @returns List of recommended user profiles and scores
+ */
+export const getRecommendations = async (userId: string, limit: number = 3) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/recommendations?limit=${limit}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, errorData.detail || `Failed to fetch recommendations: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(0, `Network error: ${error.message}`);
+  }
+};
+
+/**
+ * Record a swipe decision for a user
+ * @param userId The ID of the user who is swiping
+ * @param targetUserId The ID of the user being swiped on
+ * @param decision 0 for dislike, 1 for like, 2 for super like
+ * @returns Success message
+ */
+export const recordSwipe = async (userId: string, targetUserId: string, decision: number) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/swipe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        target_user_id: targetUserId,
+        decision: decision,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, errorData.detail || `Failed to record swipe: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(0, `Network error: ${error.message}`);
+  }
+};

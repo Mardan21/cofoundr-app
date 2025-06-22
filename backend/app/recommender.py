@@ -413,18 +413,39 @@ class CoFounderRecommender:
 _recommender_instance = None
 
 def get_recommender() -> CoFounderRecommender:
-    """Get singleton recommender instance for continuous memory"""
+    """Get the singleton recommender instance"""
     global _recommender_instance
     if _recommender_instance is None:
         _recommender_instance = CoFounderRecommender()
     return _recommender_instance
 
-# Flask route helpers for continuous feedback
-def handle_swipe_feedback(user_id: str, swiped_user_id: str, decision: int):
-    """Handle swipe feedback for continuous learning"""
+async def handle_swipe_feedback(user_id: str, swiped_user_id: str, decision: int):
+    """
+    Asynchronously handles the feedback from a swipe to update the recommender model.
+    This function can be run as a background task.
+    """
+    from .database import get_db  # Local import to avoid circular dependency
+    
     recommender = get_recommender()
-    recommender.update_swipe_cache(user_id, swiped_user_id)
-    print(f"📝 Swipe feedback recorded: User {user_id} swiped {decision} on {swiped_user_id}")
+    db = get_db()
+
+    try:
+        # Update swipe cache immediately for filtering
+        recommender.update_swipe_cache(user_id, swiped_user_id)
+
+        # Get user profiles for learning
+        user_profile = await db.get_user_by_id(user_id)
+        target_profile = await db.get_user_by_id(swiped_user_id)
+
+        if user_profile and target_profile:
+            # This part can be slow, so it's a good candidate for background execution
+            print(f"Learning from swipe: {user_id} -> {target_profile.get('full_name', 'N/A')}")
+            recommender.learn_from_swipe(user_profile, target_profile, decision)
+        
+        return True # Explicitly return a value
+    except Exception as e:
+        print(f"Error in swipe feedback handler: {e}")
+        return False # Return False on error
 
 def get_recommendations(user_id: str, user_profile: Dict, all_candidates: List[Dict], 
                        swipe_history: List[Dict]) -> List[Tuple[Dict, float]]:

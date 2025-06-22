@@ -276,7 +276,7 @@ async def record_swipe(user_id: str, swipe: SwipeDecision, db: MongoDBManager = 
         swipe_id = await db.save_swipe(user_id, swipe.target_user_id, swipe.decision)
         
         # Update recommender cache for continuous learning
-        handle_swipe_feedback(user_id, swipe.target_user_id, swipe.decision)
+        await handle_swipe_feedback(user_id, swipe.target_user_id, swipe.decision)
         
         return {
             "message": "Swipe recorded successfully",
