@@ -288,8 +288,8 @@ async def record_swipe(user_id: str, swipe: SwipeDecision, db: MongoDBManager = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error recording swipe: {str(e)}")
 
-@app.post("/users/{user_id}/recommendations", response_model=RecommendationResponse)
-async def get_recommendations(user_id: str, request: RecommendationRequest, db: MongoDBManager = Depends(get_db)):
+@app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
+async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
     """Get personalized recommendations for a user"""
     try:
         # Get user profile
@@ -339,14 +339,17 @@ async def get_recommendations(user_id: str, request: RecommendationRequest, db: 
         )
         
         # Limit results
-        recommendations_with_scores = recommendations_with_scores[:request.limit]
+        recommendations_with_scores = recommendations_with_scores[:limit]
         
         # Separate recommendations and scores
         recommendations = [rec[0] for rec in recommendations_with_scores]
         scores = [rec[1] for rec in recommendations_with_scores]
         
+        # Clean ObjectIds from recommendations before returning
+        cleaned_recommendations = [clean_objectids(rec) for rec in recommendations]
+        
         return RecommendationResponse(
-            recommendations=recommendations,
+            recommendations=cleaned_recommendations,
             scores=scores
         )
     except HTTPException:
@@ -412,9 +415,12 @@ async def get_swipe_history(user_id: str, limit: int = 20, db: MongoDBManager = 
         
         swipe_history = await db.get_swipe_history(user_id, limit=limit)
         
+        # Clean ObjectIds from swipe history before returning
+        cleaned_swipe_history = clean_objectids(swipe_history)
+        
         return {
             'user_id': user_id,
-            'swipe_history': swipe_history
+            'swipe_history': cleaned_swipe_history
         }
     except HTTPException:
         raise
@@ -453,9 +459,12 @@ async def get_mutual_matches(user_id: str, db: MongoDBManager = Depends(get_db))
         
         matches = await db.get_mutual_matches(user_id)
         
+        # Clean ObjectIds from matches before returning
+        cleaned_matches = clean_objectids(matches)
+        
         return {
             'user_id': user_id,
-            'matches': matches,
+            'matches': cleaned_matches,
             'total_matches': len(matches)
         }
     except HTTPException:
