@@ -267,6 +267,13 @@ export default function BrowseScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {isFetchingMore && (
+        <View style={styles.loadingIndicatorContainer}>
+          <ActivityIndicator size="small" color="#6366f1" />
+          <Text style={styles.loadingText}>Finding more profiles...</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -310,4 +317,25 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 20, color: "#6b7280", marginTop: 20 },
   drawerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   drawerContent: { backgroundColor: "white", position: 'absolute', left: 0, top: 0, bottom: 0, width: screenWidth * 0.75, paddingVertical: 50 },
+  loadingIndicatorContainer: {
+    position: 'absolute',
+    bottom: 85, // Position it above the bottom nav
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  loadingText: {
+    marginLeft: 10,
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });
