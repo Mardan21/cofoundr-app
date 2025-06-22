@@ -290,16 +290,16 @@ async def record_swipe(user_id: str, swipe: SwipeDecision, db: MongoDBManager = 
 
 @app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
 async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
+@app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
+async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
     """Get personalized recommendations for a user"""
     try:
         # Get user profile
         user = await db.get_user_by_id(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
         # Get swipe history from database
         swipe_history_records = await db.get_swipe_history(user_id, limit=100)
-        
         # Convert swipe history to format expected by recommender
         swipe_history = []
         for record in swipe_history_records:
@@ -309,10 +309,8 @@ async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager 
                     'profile': target_user,
                     'decision': record['decision']
                 })
-        
         # Use database-level filtering for better performance
         available_candidates = await db.get_available_candidates(user_id)
-        
         # Convert user profile to dict format for recommender - UPDATED FIELD NAMES
         my_profile = {
             'full_name': user.get('full_name', ''),  # Updated field name
@@ -331,13 +329,11 @@ async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager 
             '_id': user.get('_id'),  # Include ID for filtering
             'id': user.get('id')  # Include both ID formats
         }
-        
         # Get recommendations using the singleton recommender (NOT async)
         recommender = get_recommender()
         recommendations_with_scores = recommender.recommend_profiles(
             my_profile, available_candidates, swipe_history, user_id
         )
-        
         # Limit results
         recommendations_with_scores = recommendations_with_scores[:limit]
         
@@ -356,7 +352,7 @@ async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager 
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting recommendations: {str(e)}")
-
+    
 @app.get("/users/{user_id}/profile")
 async def get_user_profile(user_id: str, include_audio: bool = False, db: MongoDBManager = Depends(get_db)):
     """Get a user's profile with optional audio"""
