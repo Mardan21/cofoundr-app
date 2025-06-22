@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 import base64
+from bson import ObjectId
 
 from .models import (
     UserProfile, SwipeDecision, RecommendationRequest, 
@@ -28,6 +29,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def clean_objectids(obj):
+    """Recursively convert ObjectIds to strings in a data structure"""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {key: clean_objectids(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_objectids(item) for item in obj]
+    else:
+        return obj
+
 def merge_frontend_with_linkedin_data(frontend_data: Dict[str, Any], linkedin_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Merge minimal frontend user data with LinkedIn profile data - UPDATED FOR NEW SCHEMA
@@ -41,120 +53,68 @@ def merge_frontend_with_linkedin_data(frontend_data: Dict[str, Any], linkedin_da
     """
     merged_profile = {}
     
-    # Start with LinkedIn data as base
+    # Start with frontend data as the base. This contains user-provided info
+    # which should be prioritized for fields like bio, startup idea, etc.
+    merged_profile = frontend_data.copy() if frontend_data else {}
+
+    # If LinkedIn data is available, enrich the profile.
     if linkedin_data:
-        # Basic info from LinkedIn - UPDATED FIELD NAMES
-        merged_profile['full_name'] = linkedin_data.get('full_name', '')  # Changed from 'name'
-        merged_profile['bio'] = linkedin_data.get('summary', '')  # Using bio instead of headline
-        merged_profile['city'] = linkedin_data.get('city', '')  # Separate city field
-        merged_profile['state'] = linkedin_data.get('state', '') or linkedin_data.get('country_full_name', '')  # Separate state field
+        # Core identity - Use LinkedIn name only if not provided in form.
+        if linkedin_data.get('full_name') and not merged_profile.get('full_name'):
+            merged_profile['full_name'] = linkedin_data.get('full_name')
+
+        # Professional info - LinkedIn is the primary source if available.
+        merged_profile['role'] = linkedin_data.get('headline', merged_profile.get('role'))
+        merged_profile['profile_pic_url'] = linkedin_data.get('profile_pic_url', merged_profile.get('profile_pic_url'))
         merged_profile['follower_count'] = linkedin_data.get('follower_count', 0)
         merged_profile['connections'] = linkedin_data.get('connections', 0)
         
-        # Experience from LinkedIn - UPDATED FIELD NAME
-        linkedin_experiences = []
-        if linkedin_data.get('experiences'):
-            for exp in linkedin_data['experiences']:
-                experience = {
-                    'company': exp.get('company', ''),
-                    'title': exp.get('title', ''),
-                    'description': exp.get('description', ''),
-                    'location': exp.get('location', ''),
-                    'starts_at': exp.get('starts_at', {}),
-                    'ends_at': exp.get('ends_at', {}) if exp.get('ends_at') != "None" else None
-                }
-                linkedin_experiences.append(experience)
+        # Location - LinkedIn is primary source.
+        merged_profile['city'] = linkedin_data.get('city', merged_profile.get('city'))
+        merged_profile['state'] = linkedin_data.get('state') or linkedin_data.get('country_full_name') or merged_profile.get('state')
+
+        # Detailed sections - LinkedIn is the source. Overwrite if present.
+        if 'experiences' in linkedin_data:
+            merged_profile['experiences'] = linkedin_data['experiences']
         
-        # Education from LinkedIn
-        linkedin_education = []
-        if linkedin_data.get('education'):
-            for edu in linkedin_data['education']:
-                education = {
-                    'school': edu.get('school', ''),
-                    'degree_name': edu.get('degree_name', ''),
-                    'field_of_study': edu.get('field_of_study', ''),
-                    'starts_at': edu.get('starts_at', {}),
-                    'ends_at': edu.get('ends_at', {}) if edu.get('ends_at') != "None" else None,
-                    'description': edu.get('description', ''),
-                    'grade': edu.get('grade', ''),
-                    'activities_and_societies': edu.get('activities_and_societies', '')
-                }
-                linkedin_education.append(education)
-        
-        # Skills from LinkedIn - KEEP AS ARRAY
-        linkedin_skills = []
+        if 'education' in linkedin_data:
+            merged_profile['education'] = linkedin_data['education']
+            
         if linkedin_data.get('skills'):
-            linkedin_skills = [skill.get('name', '') for skill in linkedin_data['skills']]
-        
-        # Projects from LinkedIn accomplishments - UPDATED FIELD NAME
-        linkedin_projects = []
-        if linkedin_data.get('accomplishment_projects'):
-            for proj in linkedin_data['accomplishment_projects']:
-                project = {
-                    'name': proj.get('name', '') or proj.get('title', ''),
-                    'description': proj.get('description', '')
-                }
-                linkedin_projects.append(project)
-        
-        # Links from LinkedIn
-        linkedin_links = []
+            merged_profile['skills'] = [skill['name'] for skill in linkedin_data.get('skills', []) if 'name' in skill]
+
+        if 'accomplishment_projects' in linkedin_data:
+            merged_profile['accomplishment_projects'] = linkedin_data['accomplishment_projects']
+            
+        # Combine links, preventing duplicates
         if linkedin_data.get('links'):
-            for link in linkedin_data['links']:
-                linkedin_links.append({
-                    'name': link.get('name', ''),
-                    'url': link.get('url', '')
-                })
-    
-    # Override with frontend data (frontend data takes precedence for specific fields)
-    if frontend_data:
-        # Frontend data overrides LinkedIn data for these specific fields
-        if frontend_data.get('bio'):
-            merged_profile['bio'] = frontend_data['bio']
-        if frontend_data.get('startupIdea'):
-            merged_profile['startupIdea'] = frontend_data['startupIdea']
-        if frontend_data.get('links'):
-            merged_profile['links'] = frontend_data['links']
-        if frontend_data.get('role'):
-            merged_profile['role'] = frontend_data['role']
-        elif linkedin_data and linkedin_data.get('headline'):
-            merged_profile['role'] = linkedin_data['headline']
-        
-        # Use LinkedIn data for complex fields
-        merged_profile['skills'] = linkedin_skills if linkedin_data else frontend_data.get('skills', [])
-        merged_profile['experiences'] = linkedin_experiences if linkedin_data else frontend_data.get('experience', [])  # Note: 'experiences' plural
-        merged_profile['education'] = linkedin_education if linkedin_data else frontend_data.get('education', [])
-        merged_profile['accomplishment_projects'] = linkedin_projects if linkedin_data else frontend_data.get('projects', [])  # Updated field name
-        
-        # Add LinkedIn links to frontend links
-        if linkedin_data and linkedin_links:
             existing_links = merged_profile.get('links', [])
-            all_links = existing_links + linkedin_links
-            # Remove duplicates based on URL
-            seen_urls = set()
-            unique_links = []
-            for link in all_links:
-                if link.get('url') and link['url'] not in seen_urls:
-                    seen_urls.add(link['url'])
-                    unique_links.append(link)
-            merged_profile['links'] = unique_links
-    
-    # Set default values for required fields that might be missing
-    merged_profile.setdefault('full_name', '')  # Updated field name
-    merged_profile.setdefault('startupIdea', '')
-    merged_profile.setdefault('role', '')
-    merged_profile.setdefault('city', '')  # Separate city field
-    merged_profile.setdefault('state', '')  # Separate state field
-    merged_profile.setdefault('skills', [])
-    merged_profile.setdefault('experiences', [])  # Updated field name (plural)
-    merged_profile.setdefault('education', [])
-    merged_profile.setdefault('accomplishment_projects', [])  # Updated field name
-    merged_profile.setdefault('links', [])
+            linkedin_links = linkedin_data.get('links', [])
+            
+            existing_urls = {link['url'] for link in existing_links if isinstance(link, dict) and 'url' in link}
+            
+            for link in linkedin_links:
+                if isinstance(link, dict) and 'url' in link and link['url'] not in existing_urls:
+                    existing_links.append(link)
+            
+            merged_profile['links'] = existing_links
+
+    # Set default values for any remaining *essential* fields that are still missing.
+    # This prevents errors if both frontend and LinkedIn data are sparse.
+    merged_profile.setdefault('full_name', '')
     merged_profile.setdefault('bio', '')
-    merged_profile.setdefault('profile_pic_url', '')  # New field
-    
-    # Set default profile type and looking for text - UPDATED FIELD NAMES
-    merged_profile['profileType'] = 'founder'  # Updated field name
-    merged_profile['lookingFor'] = 'Looking for a co-founder to build something amazing together!'  # Updated field name
+    merged_profile.setdefault('startupIdea', '')
+    merged_profile.setdefault('lookingFor', 'Looking for a co-founder to build something amazing together!')
+    merged_profile.setdefault('profileType', 'founder')
+    merged_profile.setdefault('role', 'Professional')
+    merged_profile.setdefault('city', 'Unknown')
+    merged_profile.setdefault('state', 'Unknown')
+    merged_profile.setdefault('profile_pic_url', 'https://via.placeholder.com/150')
+    merged_profile.setdefault('skills', [])
+    merged_profile.setdefault('experiences', [])
+    merged_profile.setdefault('education', [])
+    merged_profile.setdefault('accomplishment_projects', [])
+    merged_profile.setdefault('links', [])
     
     return merged_profile
 
@@ -187,27 +147,31 @@ async def root():
     }
 
 @app.post("/users", response_model=Dict[str, Any])
-async def create_user(request: CreateUserRequest, db: MongoDBManager = Depends(get_db)):
+async def create_user(request: Request, db: MongoDBManager = Depends(get_db)):
     """Create a new user profile with frontend data and optional LinkedIn enrichment"""
     try:
-        # Convert frontend data to dict
-        frontend_data = request.dict(exclude={'linkedin_id'})
+        # Manually parse the request body as JSON.
+        # This bypasses the Pydantic model validation that was dropping fields.
+        frontend_data = await request.json()
+        
+        # Extract linkedin_id and remove it from the main data dict.
+        linkedin_id = frontend_data.pop('linkedin_id', None)
         
         # Initialize LinkedIn data as None
         linkedin_data = None
         audio_base64 = None
         
         # If LinkedIn ID is provided, fetch LinkedIn profile data and generate audio
-        if request.linkedin_id:
+        if linkedin_id:
             try:
                 # Use the enrich function to get both profile data and audio
-                enrich_result = await linkedin_integration.enrich_user_profile(request.linkedin_id)
+                enrich_result = await linkedin_integration.enrich_user_profile(linkedin_id)
                 if enrich_result['success']:
                     linkedin_data = enrich_result['profile_data']
                     audio_base64 = enrich_result.get('audio_base64')
-                    print(f"✅ Successfully fetched LinkedIn data and audio for {request.linkedin_id}")
+                    print(f"✅ Successfully fetched LinkedIn data and audio for {linkedin_id}")
                 else:
-                    print(f"⚠️  Failed to enrich LinkedIn data for {request.linkedin_id}: {enrich_result.get('error')}")
+                    print(f"⚠️  Failed to enrich LinkedIn data for {linkedin_id}: {enrich_result.get('error')}")
             except Exception as e:
                 print(f"⚠️  Error enriching LinkedIn data: {e}")
         
@@ -237,10 +201,16 @@ async def create_user(request: CreateUserRequest, db: MongoDBManager = Depends(g
         # Save embeddings to database
         await db.save_user_embeddings(user_id, embeddings)
         
+        # Convert ObjectId to string for JSON serialization
+        user_id_str = str(user_id)
+        
+        # Clean any ObjectIds from the profile data
+        clean_profile = clean_objectids(merged_user_data)
+        
         response_data = {
             "message": "User created successfully",
-            "user_id": user_id,
-            "profile": merged_user_data,
+            "user_id": user_id_str,
+            "profile": clean_profile,
             "linkedin_enriched": linkedin_data is not None
         }
         
@@ -279,8 +249,8 @@ async def create_user_with_linkedin(linkedin_id: str, request: CreateUserRequest
         
         return {
             "message": "User created successfully with LinkedIn enrichment",
-            "user_id": user_id,
-            "profile": merged_user_data,
+            "user_id": str(user_id),  # Convert ObjectId to string
+            "profile": clean_objectids(merged_user_data),  # Clean ObjectIds
             "linkedin_id": linkedin_id
         }
     except HTTPException:
@@ -396,7 +366,8 @@ async def get_user_profile(user_id: str, include_audio: bool = False, db: MongoD
         if not include_audio and 'audio_base64' in user:
             user.pop('audio_base64')
         
-        return user
+        # Clean ObjectIds from the response
+        return clean_objectids(user)
     except HTTPException:
         raise
     except Exception as e:

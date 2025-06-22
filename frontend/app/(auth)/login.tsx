@@ -203,11 +203,20 @@ export default function LoginScreen() {
     const mockUser: User = {
       id: "mock-user-123",
       email: "test@example.com",
-      name: "", // Empty so they go to profile setup
-      profileType: null,
-      companyName: "",
-      showCompany: true,
+      full_name: "", // Empty so they go to profile setup
       bio: "",
+      startupIdea: "",
+      role: "",
+      city: "",
+      state: "",
+      profile_pic_url: "",
+      skills: [],
+      experiences: [],
+      education: [],
+      accomplishment_projects: [],
+      links: [],
+      lookingFor: "",
+      profileType: "founder",
       createdAt: new Date().toISOString(),
     };
 

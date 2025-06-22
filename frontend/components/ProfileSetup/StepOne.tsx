@@ -28,8 +28,8 @@ export default function StepOne({
   const validate = () => {
     const newErrors: Partial<ProfileSetupData> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
+    if (!formData.full_name.trim()) {
+      newErrors.full_name = "Full name is required";
     }
     if (!formData.profileType) {
       newErrors.profileType = "Please select a profile type" as any;
@@ -51,13 +51,14 @@ export default function StepOne({
 
       <TextInput
         label="Full Name"
-        value={formData.name}
-        onChangeText={(text) => setFormData({ ...formData, name: text })}
-        error={!!errors.name}
+        value={formData.full_name}
+        onChangeText={(text) => setFormData({ ...formData, full_name: text })}
+        error={!!errors.full_name}
         style={styles.input}
+        placeholder="Enter your full name"
       />
-      <HelperText type="error" visible={!!errors.name}>
-        {errors.name}
+      <HelperText type="error" visible={!!errors.full_name}>
+        {errors.full_name}
       </HelperText>
 
       <Text style={styles.label}>I am a:</Text>
@@ -67,7 +68,8 @@ export default function StepOne({
         }
         value={formData.profileType || ""}
       >
-        <RadioButton.Item label="Cofounder" value="cofounder" />
+        <RadioButton.Item label="Founder" value="founder" />
+        <RadioButton.Item label="Co-founder" value="cofounder" />
         <RadioButton.Item label="Mentor" value="mentor" />
         <RadioButton.Item label="Investor" value="investor" />
       </RadioButton.Group>
