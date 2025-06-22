@@ -46,6 +46,14 @@ class UserProfile(BaseModel):
     what_im_looking_for: str = Field(alias="what I'm looking for")
     profileType: ProfileType
 
+class CreateUserRequest(BaseModel):
+    """Request model for creating a user with minimal frontend data and optional LinkedIn enrichment"""
+    # Frontend data (minimal set)
+    bio: str
+    startupIdea: str
+    links: List[Link]
+    linkedin_id: Optional[str] = None
+
 class SwipeDecision(BaseModel):
     target_user_id: str
     decision: int  # 1 = like, 2 = super like, 0 = dislike
