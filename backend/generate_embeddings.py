@@ -4,9 +4,13 @@ Generate embeddings for all existing users in the database
 """
 
 import asyncio
+import os
+from dotenv import load_dotenv
 from app.database import MongoDBManager
 from app.recommender import CoFounderRecommender
 
+# Load environment variables from .env file
+load_dotenv()
 async def generate_embeddings_for_all_users():
     """Generate embeddings for all users in the database"""
     print("🧠 Generating embeddings for all users...")
@@ -31,7 +35,7 @@ async def generate_embeddings_for_all_users():
         
         for i, user in enumerate(users, 1):
             try:
-                print(f"Processing {i}/{len(users)}: {user['name']}...")
+                print(f"Processing {i}/{len(users)}: {user['full_name']}...")
                 
                 # Generate embeddings
                 embeddings = recommender.generate_embeddings(user)
@@ -39,11 +43,11 @@ async def generate_embeddings_for_all_users():
                 # Save embeddings to database
                 await db.save_user_embeddings(user['id'], embeddings)
                 
-                print(f"✅ Generated embeddings for {user['name']}")
+                print(f"✅ Generated embeddings for {user['full_name']}")
                 success_count += 1
                 
             except Exception as e:
-                print(f"❌ Error processing {user['name']}: {e}")
+                print(f"❌ Error processing {user['full_name']}: {e}")
                 error_count += 1
         
         print()

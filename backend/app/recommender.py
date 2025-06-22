@@ -24,10 +24,10 @@ class CoFounderRecommender:
         self.user_field_weights = self._load_weights()
         self.user_swipe_cache = self._load_swipe_cache()  # user_id -> set of swiped_user_ids
         
-        # Base weights (fallback for new users)
+        # Base weights (fallback for new users) - Updated for new schema
         self.base_weights = {
             'skills': 0.25, 'startup': 0.20, 'role_location': 0.10, 'experience': 0.15,
-            'education': 0.10, 'projects': 0.10, 'accomplishments': 0.05, 'looking_for': 0.05
+            'education': 0.10, 'projects': 0.10, 'bio': 0.05, 'looking_for': 0.05
         }
     
     def _load_weights(self) -> Dict[str, Dict[str, float]]:
@@ -175,7 +175,7 @@ class CoFounderRecommender:
         # Store examples of what user liked/disliked for each field
         field_preferences = {
             'skills': [], 'startup': [], 'role_location': [], 'experience': [],
-            'education': [], 'projects': [], 'accomplishments': [], 'looking_for': []
+            'education': [], 'projects': [], 'bio': [], 'looking_for': []
         }
         
         if not swipe_history:
@@ -334,8 +334,10 @@ class CoFounderRecommender:
                     # Update persistent cache
                     self.update_swipe_cache(user_id, normalized_id)
         
-        # Filter candidates to exclude already swiped users
+        # Filter candidates to exclude already swiped users + self
         available_candidates = []
+        my_user_id = self.normalize_user_id(my_profile.get('_id') or my_profile.get('id'))
+        
         for candidate in all_candidates:
             # Try multiple possible ID fields
             candidate_id = (candidate.get('id') or 
@@ -345,12 +347,16 @@ class CoFounderRecommender:
             
             if candidate_id:
                 normalized_id = self.normalize_user_id(candidate_id)
-                if normalized_id and normalized_id not in swiped_user_ids:
+                # Exclude already swiped users AND exclude self
+                if normalized_id and normalized_id not in swiped_user_ids and normalized_id != my_user_id:
                     available_candidates.append(candidate)
             else:
-                # If no ID found, include but warn
-                print(f"⚠️  Candidate has no ID field: {candidate}")
-                available_candidates.append(candidate)
+                # If no ID found, include but warn (unless it's clearly the same person)
+                candidate_name = candidate.get('full_name', '') or candidate.get('name', '')
+                my_name = my_profile.get('full_name', '') or my_profile.get('name', '')
+                if candidate_name != my_name:  # Basic name check to avoid self-recommendation
+                    print(f"⚠️  Candidate has no ID field: {candidate}")
+                    available_candidates.append(candidate)
         
         print(f"📊 Filtered {len(all_candidates)} candidates to {len(available_candidates)} available (excluded {len(swiped_user_ids)} already swiped)")
         
@@ -409,23 +415,11 @@ def get_recommender() -> CoFounderRecommender:
     return _recommender_instance
 
 # Flask route helpers for continuous feedback
-async def handle_swipe_feedback(user_id: str, swiped_user_id: str, decision: int):
-    """Handle swipe feedback for continuous learning - SAVES TO BOTH CACHE AND DATABASE"""
+def handle_swipe_feedback(user_id: str, swiped_user_id: str, decision: int):
+    """Handle swipe feedback for continuous learning"""
     recommender = get_recommender()
-    
-    # Update local cache
     recommender.update_swipe_cache(user_id, swiped_user_id)
-    
-    # Save to database
-    try:
-        from app.database import get_db
-        db = get_db()
-        await db.save_swipe(user_id, swiped_user_id, decision)
-        print(f"📝 Swipe feedback recorded: User {user_id} swiped {decision} on {swiped_user_id} (DB + Cache)")
-    except Exception as e:
-        print(f"❌ Error saving swipe to database: {e}")
-        # Still update cache even if DB fails
-        print(f"📝 Swipe feedback recorded: User {user_id} swiped {decision} on {swiped_user_id} (Cache only)")
+    print(f"📝 Swipe feedback recorded: User {user_id} swiped {decision} on {swiped_user_id}")
 
 def get_recommendations(user_id: str, user_profile: Dict, all_candidates: List[Dict], 
                        swipe_history: List[Dict]) -> List[Tuple[Dict, float]]:

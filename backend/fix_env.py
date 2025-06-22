@@ -15,7 +15,7 @@ RELOAD=true
 
 # MongoDB Atlas Configuration
 MONGODB_URL=mongodb+srv://vaibhav:GiAr2e0PpsWuB2zb@cluster0.pjxhtwr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-DATABASE_NAME=Profile
+DATABASE_NAME=Profile2
 
 # Logging
 LOG_LEVEL=info

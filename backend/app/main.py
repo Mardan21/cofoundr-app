@@ -6,9 +6,9 @@ from datetime import datetime
 
 from .models import (
     UserProfile, SwipeDecision, RecommendationRequest, 
-    RecommendationResponse, ProfileType
+    RecommendationResponse, ProfileType, CreateUserRequest
 )
-from .recommender import CoFounderRecommender, handle_swipe_feedback
+from .recommender import get_recommender, handle_swipe_feedback
 from .database import get_db, MongoDBManager
 from .linkedin_integration import linkedin_integration
 
@@ -27,8 +27,135 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize recommender system
-recommender = CoFounderRecommender()
+def merge_frontend_with_linkedin_data(frontend_data: Dict[str, Any], linkedin_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge minimal frontend user data with LinkedIn profile data - UPDATED FOR NEW SCHEMA
+    
+    Args:
+        frontend_data: Minimal data from the frontend (bio, startupIdea, links)
+        linkedin_data: Data from LinkedIn API
+        
+    Returns:
+        Complete user profile data matching new MongoDB schema
+    """
+    merged_profile = {}
+    
+    # Start with LinkedIn data as base
+    if linkedin_data:
+        # Basic info from LinkedIn - UPDATED FIELD NAMES
+        merged_profile['full_name'] = linkedin_data.get('full_name', '')  # Changed from 'name'
+        merged_profile['bio'] = linkedin_data.get('summary', '')  # Using bio instead of headline
+        merged_profile['city'] = linkedin_data.get('city', '')  # Separate city field
+        merged_profile['state'] = linkedin_data.get('state', '') or linkedin_data.get('country_full_name', '')  # Separate state field
+        merged_profile['follower_count'] = linkedin_data.get('follower_count', 0)
+        merged_profile['connections'] = linkedin_data.get('connections', 0)
+        
+        # Experience from LinkedIn - UPDATED FIELD NAME
+        linkedin_experiences = []
+        if linkedin_data.get('experiences'):
+            for exp in linkedin_data['experiences']:
+                experience = {
+                    'company': exp.get('company', ''),
+                    'title': exp.get('title', ''),
+                    'description': exp.get('description', ''),
+                    'location': exp.get('location', ''),
+                    'starts_at': exp.get('starts_at', {}),
+                    'ends_at': exp.get('ends_at', {}) if exp.get('ends_at') != "None" else None
+                }
+                linkedin_experiences.append(experience)
+        
+        # Education from LinkedIn
+        linkedin_education = []
+        if linkedin_data.get('education'):
+            for edu in linkedin_data['education']:
+                education = {
+                    'school': edu.get('school', ''),
+                    'degree_name': edu.get('degree_name', ''),
+                    'field_of_study': edu.get('field_of_study', ''),
+                    'starts_at': edu.get('starts_at', {}),
+                    'ends_at': edu.get('ends_at', {}) if edu.get('ends_at') != "None" else None,
+                    'description': edu.get('description', ''),
+                    'grade': edu.get('grade', ''),
+                    'activities_and_societies': edu.get('activities_and_societies', '')
+                }
+                linkedin_education.append(education)
+        
+        # Skills from LinkedIn - KEEP AS ARRAY
+        linkedin_skills = []
+        if linkedin_data.get('skills'):
+            linkedin_skills = [skill.get('name', '') for skill in linkedin_data['skills']]
+        
+        # Projects from LinkedIn accomplishments - UPDATED FIELD NAME
+        linkedin_projects = []
+        if linkedin_data.get('accomplishment_projects'):
+            for proj in linkedin_data['accomplishment_projects']:
+                project = {
+                    'name': proj.get('name', '') or proj.get('title', ''),
+                    'description': proj.get('description', '')
+                }
+                linkedin_projects.append(project)
+        
+        # Links from LinkedIn
+        linkedin_links = []
+        if linkedin_data.get('links'):
+            for link in linkedin_data['links']:
+                linkedin_links.append({
+                    'name': link.get('name', ''),
+                    'url': link.get('url', '')
+                })
+    
+    # Override with frontend data (frontend data takes precedence for specific fields)
+    if frontend_data:
+        # Frontend data overrides LinkedIn data for these specific fields
+        if frontend_data.get('bio'):
+            merged_profile['bio'] = frontend_data['bio']
+        if frontend_data.get('startupIdea'):
+            merged_profile['startupIdea'] = frontend_data['startupIdea']
+        if frontend_data.get('links'):
+            merged_profile['links'] = frontend_data['links']
+        if frontend_data.get('role'):
+            merged_profile['role'] = frontend_data['role']
+        elif linkedin_data and linkedin_data.get('headline'):
+            merged_profile['role'] = linkedin_data['headline']
+        
+        # Use LinkedIn data for complex fields
+        merged_profile['skills'] = linkedin_skills if linkedin_data else frontend_data.get('skills', [])
+        merged_profile['experiences'] = linkedin_experiences if linkedin_data else frontend_data.get('experience', [])  # Note: 'experiences' plural
+        merged_profile['education'] = linkedin_education if linkedin_data else frontend_data.get('education', [])
+        merged_profile['accomplishment_projects'] = linkedin_projects if linkedin_data else frontend_data.get('projects', [])  # Updated field name
+        
+        # Add LinkedIn links to frontend links
+        if linkedin_data and linkedin_links:
+            existing_links = merged_profile.get('links', [])
+            all_links = existing_links + linkedin_links
+            # Remove duplicates based on URL
+            seen_urls = set()
+            unique_links = []
+            for link in all_links:
+                if link.get('url') and link['url'] not in seen_urls:
+                    seen_urls.add(link['url'])
+                    unique_links.append(link)
+            merged_profile['links'] = unique_links
+    
+    # Set default values for required fields that might be missing
+    merged_profile.setdefault('full_name', '')  # Updated field name
+    merged_profile.setdefault('startupIdea', '')
+    merged_profile.setdefault('role', '')
+    merged_profile.setdefault('city', '')  # Separate city field
+    merged_profile.setdefault('state', '')  # Separate state field
+    merged_profile.setdefault('skills', [])
+    merged_profile.setdefault('experiences', [])  # Updated field name (plural)
+    merged_profile.setdefault('education', [])
+    merged_profile.setdefault('accomplishment_projects', [])  # Updated field name
+    merged_profile.setdefault('links', [])
+    merged_profile.setdefault('bio', '')
+    merged_profile.setdefault('profile_pic_url', '')  # New field
+    
+    # Set default profile type and looking for text - UPDATED FIELD NAMES
+    merged_profile['profileType'] = 'founder'  # Updated field name
+    merged_profile['lookingFor'] = 'Looking for a co-founder to build something amazing together!'  # Updated field name
+    
+    return merged_profile
 
 @app.on_event("startup")
 async def startup_event():
@@ -59,26 +186,91 @@ async def root():
     }
 
 @app.post("/users", response_model=Dict[str, Any])
-async def create_user(profile: UserProfile, db: MongoDBManager = Depends(get_db)):
-    """Create a new user profile and generate embeddings"""
+async def create_user(request: CreateUserRequest, db: MongoDBManager = Depends(get_db)):
+    """Create a new user profile with frontend data and optional LinkedIn enrichment"""
     try:
-        # Convert profile to dict
-        user_data = profile.dict()
+        # Convert frontend data to dict
+        frontend_data = request.dict(exclude={'linkedin_id'})
+        
+        # Initialize LinkedIn data as None
+        linkedin_data = None
+        audio_base64 = None
+        
+        # If LinkedIn ID is provided, fetch LinkedIn profile data and generate audio
+        if request.linkedin_id:
+            try:
+                # Use the enrich function to get both profile data and audio
+                enrich_result = await linkedin_integration.enrich_user_profile(request.linkedin_id)
+                if enrich_result['success']:
+                    linkedin_data = enrich_result['profile_data']
+                    audio_base64 = enrich_result.get('audio_base64')
+                    print(f"✅ Successfully fetched LinkedIn data and audio for {request.linkedin_id}")
+                else:
+                    print(f"⚠️  Failed to enrich LinkedIn data for {request.linkedin_id}: {enrich_result.get('error')}")
+            except Exception as e:
+                print(f"⚠️  Error enriching LinkedIn data: {e}")
+        
+        # Merge frontend data with LinkedIn data
+        merged_user_data = merge_frontend_with_linkedin_data(frontend_data, linkedin_data)
         
         # Create user in database
-        user_id = await db.create_user(user_data)
+        user_id = await db.create_user(merged_user_data, audio_base64)
         
         # Generate embeddings
-        embeddings = recommender.generate_embeddings(user_data)
+        recommender = get_recommender()
+        embeddings = recommender.generate_embeddings(merged_user_data)
+        
+        # Save embeddings to database
+        await db.save_user_embeddings(user_id, embeddings)
+        
+        response_data = {
+            "message": "User created successfully",
+            "user_id": user_id,
+            "profile": merged_user_data,
+            "linkedin_enriched": linkedin_data is not None
+        }
+        
+        # Add audio if available
+        if audio_base64:
+            response_data["audio_base64"] = audio_base64
+        
+        return response_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
+
+@app.post("/users/with-linkedin/{linkedin_id}", response_model=Dict[str, Any])
+async def create_user_with_linkedin(linkedin_id: str, request: CreateUserRequest, db: MongoDBManager = Depends(get_db)):
+    """Create a new user profile with LinkedIn enrichment using the provided LinkedIn ID"""
+    try:
+        # Convert frontend data to dict
+        frontend_data = request.dict(exclude={'linkedin_id'})
+        
+        # Fetch LinkedIn profile data
+        linkedin_data = await linkedin_integration.get_linkedin_profile(linkedin_id)
+        if not linkedin_data:
+            raise HTTPException(status_code=404, detail=f"LinkedIn profile not found for ID: {linkedin_id}")
+        
+        # Merge frontend data with LinkedIn data
+        merged_user_data = merge_frontend_with_linkedin_data(frontend_data, linkedin_data)
+        
+        # Create user in database
+        user_id = await db.create_user(merged_user_data)
+        
+        # Generate embeddings
+        recommender = get_recommender()
+        embeddings = recommender.generate_embeddings(merged_user_data)
         
         # Save embeddings to database
         await db.save_user_embeddings(user_id, embeddings)
         
         return {
-            "message": "User created successfully",
+            "message": "User created successfully with LinkedIn enrichment",
             "user_id": user_id,
-            "profile": user_data
+            "profile": merged_user_data,
+            "linkedin_id": linkedin_id
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
@@ -121,8 +313,8 @@ async def get_recommendations(user_id: str, request: RecommendationRequest, db: 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Get swipe history
-        swipe_history_records = await db.get_swipe_history(user_id, limit=50)
+        # Get swipe history from database
+        swipe_history_records = await db.get_swipe_history(user_id, limit=100)
         
         # Convert swipe history to format expected by recommender
         swipe_history = []
@@ -134,28 +326,32 @@ async def get_recommendations(user_id: str, request: RecommendationRequest, db: 
                     'decision': record['decision']
                 })
         
-        # Get all candidate users (excluding current user)
-        all_candidates = await db.get_all_users(exclude_user_id=user_id)
+        # Use database-level filtering for better performance
+        available_candidates = await db.get_available_candidates(user_id)
         
-        # Convert user profile to dict format for recommender
+        # Convert user profile to dict format for recommender - UPDATED FIELD NAMES
         my_profile = {
-            'name': user['name'],
-            'startupIdea': user['startupIdea'],
-            'role': user['role'],
-            'location': user['location'],
-            'skills': user['skills'],
-            'experience': user['experience'],
-            'education': user['education'],
-            'projects': user['projects'],
-            'links': user['links'],
-            'accomplishments': user['accomplishments'],
-            'what I\'m looking for': user.get('what I\'m looking for', ''),
-            'profileType': user['profileType']
+            'full_name': user.get('full_name', ''),  # Updated field name
+            'startupIdea': user.get('startupIdea', ''),
+            'role': user.get('role', ''),
+            'city': user.get('city', ''),  # Separate city field
+            'state': user.get('state', ''),  # Separate state field
+            'skills': user.get('skills', []),
+            'experiences': user.get('experiences', []),  # Updated field name (plural)
+            'education': user.get('education', []),
+            'accomplishment_projects': user.get('accomplishment_projects', []),  # Updated field name
+            'links': user.get('links', []),
+            'bio': user.get('bio', ''),
+            'lookingFor': user.get('lookingFor', ''),  # Updated field name
+            'profileType': user.get('profileType', 'founder'),  # Updated field name
+            '_id': user.get('_id'),  # Include ID for filtering
+            'id': user.get('id')  # Include both ID formats
         }
         
-        # Get recommendations using async function
-        recommendations_with_scores = await recommender.recommend_profiles(
-            my_profile, all_candidates, swipe_history, user_id
+        # Get recommendations using the singleton recommender (NOT async)
+        recommender = get_recommender()
+        recommendations_with_scores = recommender.recommend_profiles(
+            my_profile, available_candidates, swipe_history, user_id
         )
         
         # Limit results
@@ -175,12 +371,16 @@ async def get_recommendations(user_id: str, request: RecommendationRequest, db: 
         raise HTTPException(status_code=500, detail=f"Error getting recommendations: {str(e)}")
 
 @app.get("/users/{user_id}/profile")
-async def get_user_profile(user_id: str, db: MongoDBManager = Depends(get_db)):
-    """Get a user's profile"""
+async def get_user_profile(user_id: str, include_audio: bool = False, db: MongoDBManager = Depends(get_db)):
+    """Get a user's profile with optional audio"""
     try:
         user = await db.get_user_by_id(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # Remove audio from response unless specifically requested
+        if not include_audio and 'audio_base64' in user:
+            user.pop('audio_base64')
         
         return user
     except HTTPException:
@@ -207,6 +407,48 @@ async def get_swipe_history(user_id: str, limit: int = 20, db: MongoDBManager = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting swipe history: {str(e)}")
 
+@app.get("/users/{user_id}/audio")
+async def get_user_audio(user_id: str, db: MongoDBManager = Depends(get_db)):
+    """Get user's audio profile"""
+    try:
+        user = await db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        audio_base64 = user.get('audio_base64')
+        if not audio_base64:
+            raise HTTPException(status_code=404, detail="No audio found for this user")
+        
+        return {
+            "user_id": user_id,
+            "audio_base64": audio_base64,
+            "message": "Audio retrieved successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting user audio: {str(e)}")
+
+@app.get("/users/{user_id}/matches")
+async def get_mutual_matches(user_id: str, db: MongoDBManager = Depends(get_db)):
+    """Get mutual matches for a user"""
+    try:
+        user = await db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        matches = await db.get_mutual_matches(user_id)
+        
+        return {
+            'user_id': user_id,
+            'matches': matches,
+            'total_matches': len(matches)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting matches: {str(e)}")
+
 @app.get("/stats")
 async def get_stats(db: MongoDBManager = Depends(get_db)):
     """Get system statistics"""
@@ -215,9 +457,16 @@ async def get_stats(db: MongoDBManager = Depends(get_db)):
         total_users = await db.users.count_documents({})
         total_swipes = await db.swipe_history.count_documents({})
         
+        # Get recommender stats
+        recommender = get_recommender()
+        total_learned_users = len(recommender.user_field_weights)
+        total_cached_swipes = sum(len(swipes) for swipes in recommender.user_swipe_cache.values())
+        
         return {
             'total_users': total_users,
             'total_swipes': total_swipes,
+            'users_with_learned_preferences': total_learned_users,
+            'cached_swipe_relationships': total_cached_swipes,
             'server_status': 'healthy',
             'timestamp': datetime.utcnow().isoformat()
         }
@@ -356,34 +605,43 @@ async def enrich_user_from_linkedin(user_id: str, linkedin_id: str, db: MongoDBM
             # Merge LinkedIn data with existing profile
             updated_profile = user.copy()
             
-            # Update fields if they exist in LinkedIn data
-            if linkedin_data.get('full_name') and not user.get('name'):
-                updated_profile['name'] = linkedin_data['full_name']
+            # Update fields if they exist in LinkedIn data - UPDATED FIELD NAMES
+            if linkedin_data.get('full_name') and not user.get('full_name'):
+                updated_profile['full_name'] = linkedin_data['full_name']
             
             if linkedin_data.get('headline') and not user.get('role'):
                 updated_profile['role'] = linkedin_data['headline']
             
-            if linkedin_data.get('summary') and not user.get('startupIdea'):
-                updated_profile['startupIdea'] = linkedin_data['summary'][:500]  # Limit length
+            if linkedin_data.get('summary') and not user.get('bio'):
+                updated_profile['bio'] = linkedin_data['summary']
             
-            if linkedin_data.get('experiences') and not user.get('experience'):
+            if linkedin_data.get('city') and not user.get('city'):
+                updated_profile['city'] = linkedin_data['city']
+            
+            if linkedin_data.get('experiences') and not user.get('experiences'):
                 # Convert LinkedIn experiences to our format
                 experiences = []
                 for exp in linkedin_data['experiences'][:3]:  # Limit to 3
                     experiences.append({
                         'title': exp.get('title', ''),
                         'description': exp.get('description', ''),
-                        'company': exp.get('company', '')
+                        'company': exp.get('company', ''),
+                        'location': exp.get('location', ''),
+                        'starts_at': exp.get('starts_at', {}),
+                        'ends_at': exp.get('ends_at', {})
                     })
-                updated_profile['experience'] = experiences
+                updated_profile['experiences'] = experiences  # Note: plural
             
             if linkedin_data.get('education') and not user.get('education'):
                 # Convert LinkedIn education to our format
                 education = []
                 for edu in linkedin_data['education'][:2]:  # Limit to 2
                     education.append({
-                        'degree': edu.get('degree_name', ''),
-                        'school': edu.get('school', '')
+                        'degree_name': edu.get('degree_name', ''),
+                        'field_of_study': edu.get('field_of_study', ''),
+                        'school': edu.get('school', ''),
+                        'starts_at': edu.get('starts_at', {}),
+                        'ends_at': edu.get('ends_at', {})
                     })
                 updated_profile['education'] = education
             
@@ -393,20 +651,20 @@ async def enrich_user_from_linkedin(user_id: str, linkedin_id: str, db: MongoDBM
                 updated_profile['skills'] = skills
             
             # Update user in database
-            await db.users.update_one(
-                {"_id": user['id']},
-                {"$set": updated_profile}
-            )
+            success = await db.update_user(user_id, updated_profile)
             
-            return {
-                'success': True,
-                'user_id': user_id,
-                'linkedin_id': linkedin_id,
-                'updated_profile': updated_profile,
-                'summary': result['summary'],
-                'audio_base64': result['audio_base64'],
-                'message': 'User profile enriched with LinkedIn data'
-            }
+            if success:
+                return {
+                    'success': True,
+                    'user_id': user_id,
+                    'linkedin_id': linkedin_id,
+                    'updated_profile': updated_profile,
+                    'summary': result['summary'],
+                    'audio_base64': result['audio_base64'],
+                    'message': 'User profile enriched with LinkedIn data'
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to update user profile")
         else:
             raise HTTPException(status_code=400, detail=result['error'])
             
@@ -417,4 +675,4 @@ async def enrich_user_from_linkedin(user_id: str, linkedin_id: str, db: MongoDBM
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
