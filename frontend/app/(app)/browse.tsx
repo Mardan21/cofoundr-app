@@ -46,7 +46,7 @@ export default function BrowseScreen() {
   const fetchProfiles = async (limit: number) => {
     if (!user?.id) return [];
     try {
-        const userIdToFetch = "6857b0f7b01beb3b82c39f91"; // Using hardcoded ID as requested
+        const userIdToFetch = "6857e1912157b9f34c4b5f74"; // Using hardcoded ID as requested
         const data = await getRecommendations(userIdToFetch, limit);
         return data.recommendations || [];
     } catch (error: any) {
@@ -117,7 +117,7 @@ export default function BrowseScreen() {
     if (!swipedUser || !user?.id) return;
 
     const decision = direction === 1 ? 1 : 0; // 1 for right (like), 0 for left (dislike)
-    const userIdToSwipe = "6857b0f7b01beb3b82c39f91"; // Hardcoded as requested
+    const userIdToSwipe = "6857e1912157b9f34c4b5f74"; // Hardcoded as requested
     
     recordSwipe(userIdToSwipe, swipedUser.id, decision).catch(err => console.error("Swipe API call failed", err));
 
