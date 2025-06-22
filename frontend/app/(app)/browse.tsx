@@ -262,38 +262,6 @@ export default function BrowseScreen() {
                     </View>
                   </View>
                 )}
-
-                {profile.experiences && profile.experiences.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Experience</Text>
-                    {profile.experiences.map((exp, i) => (
-                      <View key={i} style={styles.listItem}>
-                        <Icon name="briefcase-outline" size={24} color="#4f46e5" />
-                        <View style={styles.listItemContent}>
-                          <Text style={styles.listItemTitle}>{exp.title}</Text>
-                          <Text style={styles.listItemSubtitle}>{exp.company}</Text>
-                          <Text style={styles.listItemDates}>{formatExperienceRange(exp.starts_at, exp.ends_at)}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                 {profile.education && profile.education.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Education</Text>
-                    {profile.education.map((edu, i) => (
-                      <View key={i} style={styles.listItem}>
-                         <Icon name="school-outline" size={24} color="#4f46e5" />
-                         <View style={styles.listItemContent}>
-                          <Text style={styles.listItemTitle}>{edu.school}</Text>
-                          <Text style={styles.listItemSubtitle}>{edu.degree_name}</Text>
-                           <Text style={styles.listItemDates}>{formatEducationRange(edu.starts_at, edu.ends_at)}</Text>
-                         </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </>
             )}
             
