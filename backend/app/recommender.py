@@ -156,6 +156,10 @@ class CoFounderRecommender:
         what_im_looking_for = profile.get("what I\\'m looking for", '') or profile.get('what_im_looking_for', '') or ""
         looking_for_embedding = self.model.encode(what_im_looking_for).tolist()
         
+        # Bio embedding
+        bio_text = profile.get('bio', '') or ""
+        bio_embedding = self.model.encode(bio_text).tolist()
+        
         return {
             'skills': skills_embedding,
             'startup': startup_embedding,
@@ -164,7 +168,8 @@ class CoFounderRecommender:
             'education': education_embedding,
             'projects': projects_embedding,
             'accomplishments': accomplishments_embedding,
-            'looking_for': looking_for_embedding
+            'looking_for': looking_for_embedding,
+            'bio': bio_embedding
         }
     
     def learn_preference_patterns(self, my_embeddings: Dict[str, List[float]], 

@@ -276,7 +276,7 @@ async def record_swipe(user_id: str, swipe: SwipeDecision, db: MongoDBManager = 
         swipe_id = await db.save_swipe(user_id, swipe.target_user_id, swipe.decision)
         
         # Update recommender cache for continuous learning
-        await handle_swipe_feedback(user_id, swipe.target_user_id, swipe.decision)
+        handle_swipe_feedback(user_id, swipe.target_user_id, swipe.decision)
         
         return {
             "message": "Swipe recorded successfully",
@@ -288,8 +288,8 @@ async def record_swipe(user_id: str, swipe: SwipeDecision, db: MongoDBManager = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error recording swipe: {str(e)}")
 
-@app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
-async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
+# @app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
+# async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
 @app.get("/users/{user_id}/recommendations", response_model=RecommendationResponse)
 async def get_recommendations(user_id: str, limit: int = 10, db: MongoDBManager = Depends(get_db)):
     """Get personalized recommendations for a user"""
