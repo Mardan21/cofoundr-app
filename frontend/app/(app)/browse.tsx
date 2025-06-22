@@ -14,6 +14,7 @@ import {
   Text,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import {
   Avatar,
@@ -27,6 +28,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { User, Experience, Education, DateInfo } from "@/types/User";
 import { getRecommendations, recordSwipe } from "@/utils/api";
 
+const defaultAvatar = require("../../assets/images/icon.png");
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 120;
 
@@ -35,6 +37,7 @@ export default function BrowseScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [imageErrors, setImageErrors] = useState<{ [id: string]: boolean }>({});
   
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [expandedCard, setExpandedCard] = useState(false);
@@ -46,7 +49,7 @@ export default function BrowseScreen() {
   const fetchProfiles = async (limit: number) => {
     if (!user?.id) return [];
     try {
-        const userIdToFetch = "6857b0f7b01beb3b82c39f91"; // Using hardcoded ID as requested
+        const userIdToFetch = "6857e1912157b9f34c4b5f74"; // Using hardcoded ID as requested
         const data = await getRecommendations(userIdToFetch, limit);
         return data.recommendations || [];
     } catch (error: any) {
@@ -117,7 +120,7 @@ export default function BrowseScreen() {
     if (!swipedUser || !user?.id) return;
 
     const decision = direction === 1 ? 1 : 0; // 1 for right (like), 0 for left (dislike)
-    const userIdToSwipe = "6857b0f7b01beb3b82c39f91"; // Hardcoded as requested
+    const userIdToSwipe = "6857e1912157b9f34c4b5f74"; // Hardcoded as requested
     
     recordSwipe(userIdToSwipe, swipedUser.id, decision).catch(err => console.error("Swipe API call failed", err));
 
@@ -139,6 +142,16 @@ export default function BrowseScreen() {
     }).start(() => handleSwipe(decision));
   };
 
+  const toHttps = (url: string): string => {
+    if (!url || url.startsWith('https://')) {
+      return url;
+    }
+    if (url.startsWith('http://')) {
+      return url.replace('http://', 'https://');
+    }
+    return url;
+  };
+
   const formatDate = (dateInfo: DateInfo | null | 'None') => {
     if (!dateInfo || dateInfo === 'None') return 'Present';
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -157,7 +170,15 @@ export default function BrowseScreen() {
     return `${start} - ${end}`;
   }
 
+  const getInitials = (name: string) => {
+    if (!name) return '??';
+    const names = name.split(' ');
+    const initials = names.map(n => n[0]).join('');
+    return initials.slice(0, 2).toUpperCase();
+  }
+
   const renderCard = (profile: User, index: number) => {
+    const hasError = imageErrors[profile.id];
     const isFirst = index === currentIndex;
     const dragHandlers = isFirst ? panResponder.panHandlers : {};
 
@@ -187,7 +208,20 @@ export default function BrowseScreen() {
       >
         <LinearGradient colors={["#ffffff", "#f8fafc"]} style={styles.card}>
           <View style={styles.cardHeader}>
-            <Avatar.Image size={90} source={{ uri: profile.profile_pic_url }} />
+            {profile.profile_pic_url && !hasError ? (
+                <Image
+                    style={styles.avatarImage}
+                    source={{ uri: toHttps(profile.profile_pic_url) }}
+                    onError={() => {
+                        console.log(`Image load error for ${profile.full_name}. Using fallback.`);
+                        setImageErrors(prev => ({ ...prev, [profile.id]: true }));
+                    }}
+                />
+            ) : !profile.profile_pic_url ? (
+                <Avatar.Text size={90} label={getInitials(profile.full_name)} style={styles.avatarText} />
+            ) : (
+                <Image source={defaultAvatar} style={styles.avatarImage} />
+            )}
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
                 <Title style={styles.name}>{profile.full_name}</Title>
@@ -226,38 +260,6 @@ export default function BrowseScreen() {
                     <View style={styles.tagContainer}>
                       {profile.skills.map((skill, i) => <View key={i} style={styles.tag}><Text style={styles.tagText}>{skill}</Text></View>)}
                     </View>
-                  </View>
-                )}
-
-                {profile.experiences && profile.experiences.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Experience</Text>
-                    {profile.experiences.map((exp, i) => (
-                      <View key={i} style={styles.listItem}>
-                        <Icon name="briefcase-outline" size={24} color="#4f46e5" />
-                        <View style={styles.listItemContent}>
-                          <Text style={styles.listItemTitle}>{exp.title}</Text>
-                          <Text style={styles.listItemSubtitle}>{exp.company}</Text>
-                          <Text style={styles.listItemDates}>{formatExperienceRange(exp.starts_at, exp.ends_at)}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                 {profile.education && profile.education.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Education</Text>
-                    {profile.education.map((edu, i) => (
-                      <View key={i} style={styles.listItem}>
-                         <Icon name="school-outline" size={24} color="#4f46e5" />
-                         <View style={styles.listItemContent}>
-                          <Text style={styles.listItemTitle}>{edu.school}</Text>
-                          <Text style={styles.listItemSubtitle}>{edu.degree_name}</Text>
-                           <Text style={styles.listItemDates}>{formatEducationRange(edu.starts_at, edu.ends_at)}</Text>
-                         </View>
-                      </View>
-                    ))}
                   </View>
                 )}
               </>
@@ -352,6 +354,15 @@ const styles = StyleSheet.create({
   cardsArea: { flex: 1, justifyContent: "center", alignItems: "center" },
   cardContainer: { position: "absolute", width: screenWidth * 0.9, height: screenHeight * 0.7, },
   card: { flex: 1, borderRadius: 24, backgroundColor: "#ffffff", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16, elevation: 8, overflow: 'hidden' },
+  avatarText: {
+    backgroundColor: '#8b5cf6',
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#e5e7eb', // Fallback color
+  },
   cardHeader: { flexDirection: "row", alignItems: 'center', padding: 24, paddingBottom: 16 },
   headerInfo: { marginLeft: 15, flex: 1 },
   name: { fontSize: 24, fontWeight: "bold", color: "#1f2937" },
