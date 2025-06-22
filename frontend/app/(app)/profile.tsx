@@ -1,8 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from "react-native";
+import React, { useState, useEffect } from "react";
+import { ScrollView, StyleSheet, TouchableOpacity, View, Image, ActivityIndicator, Alert } from "react-native";
 import {
   Avatar,
   Card,
@@ -15,10 +15,60 @@ import {
   Button,
 } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { Audio } from 'expo-av';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function playSound(base64Audio: string) {
+    if (isPlaying && sound) {
+      await sound.pauseAsync();
+      setIsPlaying(false);
+      return;
+    }
+
+    if (sound) {
+      await sound.playAsync();
+      setIsPlaying(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: `data:audio/mp3;base64,${base64Audio}` },
+        { shouldPlay: true }
+      );
+      
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setIsPlaying(false);
+          newSound.unloadAsync();
+          setSound(null);
+        }
+      });
+
+      setSound(newSound);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("Error playing audio:", error);
+      Alert.alert("Error", "Could not play audio.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
 
   const handleLogout = async () => {
     await logout();
@@ -137,6 +187,32 @@ export default function ProfileScreen() {
             <Text style={styles.bio}>{user?.bio || "No bio added yet"}</Text>
           </Card.Content>
         </Card>
+
+        {/* Audio Profile */}
+        {user?.audio_base64 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Audio Profile</Title>
+              <Text style={styles.audioDescription}>
+                Listen to an AI-generated summary of your profile
+              </Text>
+              <TouchableOpacity 
+                style={[styles.playButton, isPlaying && styles.playingButton]}
+                onPress={() => user?.audio_base64 && playSound(user.audio_base64)}
+                disabled={isLoading}
+              >
+                <View style={styles.playButtonContent}>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Icon name={isPlaying ? "pause-circle" : "play-circle"} size={24} color="white" />
+                  )}
+                  <Text style={styles.playButtonText}>{isPlaying ? "Pause" : "Play Audio Profile"}</Text>
+                </View>
+              </TouchableOpacity>
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Startup Idea */}
         <Card style={styles.card}>
@@ -494,5 +570,33 @@ const styles = StyleSheet.create({
   },
   activeNav: {
     color: "#6366f1",
+  },
+  audioDescription: {
+    fontSize: 14,
+    color: "#4b5563",
+    lineHeight: 20,
+  },
+  playButton: {
+    backgroundColor: "#6366f1",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  playingButton: {
+    backgroundColor: '#8b5cf6', // A different color for when it's playing
+  },
+  playButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  playButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 10,
   },
 });

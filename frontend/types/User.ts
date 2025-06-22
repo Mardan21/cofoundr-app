@@ -16,6 +16,7 @@ export interface User {
   lookingFor: string;
   profileType: 'founder' | 'cofounder' | 'mentor' | 'investor';
   createdAt: string;
+  audio_base64?: string;
 }
 
 export interface Experience {
