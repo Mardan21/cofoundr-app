@@ -136,11 +136,19 @@ class LinkedInIntegration:
                 output_format="mp3_44100_128",
             )
             
-            # Convert to bytes if needed
+            # Handle different return types from ElevenLabs
             if hasattr(audio, 'read'):
+                # If it's a file-like object
                 return audio.read()
-            else:
+            elif hasattr(audio, '__iter__') and not isinstance(audio, (bytes, str)):
+                # If it's a generator or iterable
+                return b''.join(audio)
+            elif isinstance(audio, bytes):
+                # If it's already bytes
                 return audio
+            else:
+                # Try to convert to bytes
+                return bytes(audio)
                 
         except Exception as e:
             print(f"Error in text-to-speech: {e}")
